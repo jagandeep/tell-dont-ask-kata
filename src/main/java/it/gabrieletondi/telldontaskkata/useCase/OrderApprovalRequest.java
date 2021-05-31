@@ -19,4 +19,8 @@ public class OrderApprovalRequest {
     public boolean isApproved() {
         return approved;
     }
+
+    public boolean isNotApproved() {
+        return !isApproved();
+    }
 }
