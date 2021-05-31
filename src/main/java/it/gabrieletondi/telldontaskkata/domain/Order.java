@@ -58,4 +58,20 @@ public class Order {
     public void setId(int id) {
         this.id = id;
     }
+
+    public BigDecimal calculateTax() {
+        BigDecimal tax = new BigDecimal("0.00");
+        for(OrderItem orderItem: getItems()) {
+            tax = tax.add(orderItem.getTax());
+        }
+        return tax;
+    }
+
+    public BigDecimal calculateTotal() {
+        BigDecimal total = new BigDecimal("0.00");
+        for(OrderItem orderItem: getItems()) {
+            total = total.add(orderItem.getTaxedAmount());
+        }
+        return total;
+    }
 }

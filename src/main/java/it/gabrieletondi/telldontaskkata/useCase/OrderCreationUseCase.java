@@ -9,9 +9,10 @@ import it.gabrieletondi.telldontaskkata.repository.ProductCatalog;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.math.BigDecimal.valueOf;
-import static java.math.RoundingMode.HALF_UP;
 
 public class OrderCreationUseCase {
     private final OrderRepository orderRepository;
@@ -23,6 +24,11 @@ public class OrderCreationUseCase {
     }
 
     public void run(SellItemsRequest request) {
+        Order order = createOrder(request);
+        orderRepository.save(order);
+    }
+
+    private Order createOrder(SellItemsRequest request) {
         Order order = new Order();
         order.setStatus(OrderStatus.CREATED);
         order.setItems(new ArrayList<>());
@@ -30,30 +36,31 @@ public class OrderCreationUseCase {
         order.setTotal(new BigDecimal("0.00"));
         order.setTax(new BigDecimal("0.00"));
 
-        for (SellItemRequest itemRequest : request.getRequests()) {
-            Product product = productCatalog.getByName(itemRequest.getProductName());
+        order.setItems(createOrderItems(request));
+        order.setTax(order.calculateTax());
+        order.setTotal(order.calculateTotal());
+        return order;
+    }
 
-            if (product == null) {
-                throw new UnknownProductException();
-            }
-            else {
-                final BigDecimal unitaryTax = product.getPrice().divide(valueOf(100)).multiply(product.getCategory().getTaxPercentage()).setScale(2, HALF_UP);
-                final BigDecimal unitaryTaxedAmount = product.getPrice().add(unitaryTax).setScale(2, HALF_UP);
-                final BigDecimal taxedAmount = unitaryTaxedAmount.multiply(BigDecimal.valueOf(itemRequest.getQuantity())).setScale(2, HALF_UP);
-                final BigDecimal taxAmount = unitaryTax.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+    private List<OrderItem> createOrderItems(SellItemsRequest request) {
+        return  request.getRequests()
+                .stream()
+                .map(this::createOrderItem)
+                .collect(Collectors.toList());
+    }
 
-                final OrderItem orderItem = new OrderItem();
-                orderItem.setProduct(product);
-                orderItem.setQuantity(itemRequest.getQuantity());
-                orderItem.setTax(taxAmount);
-                orderItem.setTaxedAmount(taxedAmount);
-                order.getItems().add(orderItem);
+    private OrderItem createOrderItem(SellItemRequest itemRequest) {
+        Product product = getProduct(itemRequest);
+        final int quantity = itemRequest.getQuantity();
+        return OrderItem.createOrderItem(product, quantity);
+    }
 
-                order.setTotal(order.getTotal().add(taxedAmount));
-                order.setTax(order.getTax().add(taxAmount));
-            }
+    private Product getProduct(SellItemRequest itemRequest) {
+        Product product = productCatalog.getByName(itemRequest.getProductName());
+
+        if (product == null) {
+            throw new UnknownProductException();
         }
-
-        orderRepository.save(order);
+        return product;
     }
 }
